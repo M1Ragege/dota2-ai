@@ -1,0 +1,187 @@
+.SetupRoot {
+    width: 100%;
+    height: 100%;
+    background-color: #0b0f14f2;
+}
+
+.MainCard {
+    width: 960px;
+    horizontal-align: center;
+    vertical-align: center;
+    flow-children: down;
+    background-color: #141a22;
+    border: 1px solid #2b3847;
+    border-radius: 8px;
+    padding: 28px 32px;
+    box-shadow: #000000aa 0px 8px 32px 0px;
+}
+
+.Title {
+    horizontal-align: center;
+    font-size: 28px;
+    font-weight: bold;
+    color: #e6f0ff;
+    letter-spacing: 2px;
+}
+
+.MatchupPreview {
+    horizontal-align: center;
+    margin-top: 8px;
+    margin-bottom: 22px;
+    font-size: 20px;
+    color: #9cb4cc;
+}
+
+.Columns {
+    width: 100%;
+    flow-children: right;
+}
+
+.SideColumn {
+    width: 360px;
+    height: 360px;
+    flow-children: down;
+    background-color: #0f141b;
+    border-radius: 6px;
+    padding: 14px;
+    border: 1px solid #232f3d;
+}
+
+.RadiantColumn {
+    border-top: 3px solid #4be3a8;
+}
+
+.DireColumn {
+    border-top: 3px solid #ff6b57;
+}
+
+.SideHeader {
+    horizontal-align: center;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+}
+
+.RadiantText { color: #67f0bb; }
+.DireText    { color: #ff8270; }
+
+.TeamList {
+    width: 100%;
+    height: fill-parent-flow(1.0);
+    flow-children: down;
+    overflow: squish scroll;
+}
+
+.TeamOption {
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background-color: #19222d;
+    border: 1px solid #263342;
+    border-radius: 4px;
+    flow-children: down;
+}
+
+.TeamOption:hover {
+    background-color: #212e3d;
+    border-color: #465d78;
+}
+
+.TeamOption.SelectedRadiant {
+    background-color: #13382e;
+    border: 2px solid #4be3a8;
+}
+
+.TeamOption.SelectedDire {
+    background-color: #3b1918;
+    border: 2px solid #ff6b57;
+}
+
+.TeamName {
+    font-size: 17px;
+    font-weight: bold;
+    color: #eef5ff;
+}
+
+.TeamFolder {
+    font-size: 12px;
+    color: #7c93ab;
+    margin-top: 2px;
+}
+
+.CenterControls {
+    width: fill-parent-flow(1.0);
+    height: 360px;
+    flow-children: down;
+    vertical-align: center;
+    padding: 90px 14px 0px 14px;
+}
+
+.VsBadge {
+    horizontal-align: center;
+    font-size: 30px;
+    font-weight: bold;
+    color: #5d738a;
+    margin-bottom: 20px;
+}
+
+.SecondaryBtn {
+    width: 100%;
+    padding: 10px 8px;
+    margin-bottom: 10px;
+    background-color: #1d2733;
+    border: 1px solid #324457;
+    border-radius: 4px;
+}
+
+.SecondaryBtn:hover {
+    background-color: #273545;
+    border-color: #5b7896;
+}
+
+.SecondaryBtn Label {
+    horizontal-align: center;
+    font-size: 14px;
+    color: #cde0f5;
+}
+
+.StatusLabel {
+    horizontal-align: center;
+    min-height: 24px;
+    margin-top: 16px;
+    margin-bottom: 12px;
+    font-size: 15px;
+    color: #7be8ff;
+}
+
+.StatusLabel.Error {
+    color: #ff6666;
+}
+
+.StartBtn {
+    horizontal-align: center;
+    width: 300px;
+    height: 50px;
+    background-color: gradient(linear, 0% 0%, 0% 100%, from(#2ea677), to(#1e7553));
+    border: 1px solid #5ee0ad;
+    border-radius: 5px;
+}
+
+.StartBtn:hover {
+    background-color: gradient(linear, 0% 0%, 0% 100%, from(#39bd89), to(#258c64));
+}
+
+.StartBtn:disabled {
+    saturation: 0.2;
+    opacity: 0.6;
+}
+
+.StartBtn Label {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffffff;
+    letter-spacing: 1px;
+}

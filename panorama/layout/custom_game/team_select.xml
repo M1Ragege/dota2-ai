@@ -1,0 +1,43 @@
+<root>
+    <styles>
+        <include src="file://{resources}/styles/custom_game/team_select.css" />
+    </styles>
+    <scripts>
+        <include src="file://{resources}/scripts/custom_game/team_select.js" />
+    </scripts>
+
+    <Panel class="SetupRoot">
+        <Panel class="MainCard">
+            <Label class="Title" text="AI TOURNAMENT — ВЫБОР МАТЧА" />
+            <Label id="MatchupPreview" class="MatchupPreview" text="Загрузка списка команд..." />
+
+            <Panel class="Columns">
+                <Panel class="SideColumn RadiantColumn">
+                    <Label class="SideHeader RadiantText" text="RADIANT (Свет)" />
+                    <Panel id="RadiantList" class="TeamList" />
+                </Panel>
+
+                <Panel class="CenterControls">
+                    <Label class="VsBadge" text="VS" />
+                    <Button id="SwapButton" class="SecondaryBtn" onactivate="OnSwapSides()">
+                        <Label text="⇄ Поменять" />
+                    </Button>
+                    <Button id="RandomButton" class="SecondaryBtn" onactivate="OnRandomMatchup()">
+                        <Label text="Случайный" />
+                    </Button>
+                </Panel>
+
+                <Panel class="SideColumn DireColumn">
+                    <Label class="SideHeader DireText" text="DIRE (Тьма)" />
+                    <Panel id="DireList" class="TeamList" />
+                </Panel>
+            </Panel>
+
+            <Label id="StatusLabel" class="StatusLabel" text="" />
+
+            <Button id="StartButton" class="StartBtn" onactivate="OnStartMatch()">
+                <Label id="StartButtonLabel" text="НАЧАТЬ МАТЧ" />
+            </Button>
+        </Panel>
+    </Panel>
+</root>

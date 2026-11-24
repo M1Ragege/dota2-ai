@@ -1,0 +1,196 @@
+ПРОМТ ДЛЯ СОЗДАНИЯ КОМАНДЫ DOTA 2 НА ОБЩЕМ SDK
+
+У тебя есть этот промт. Исходники аддона и SDK, файлы карты, координаты, реплеи и доступ к Dota для разработки не требуются. Ниже описан весь интерфейс, на который может опираться твоя команда. При генерации ты задаёшь правила поведения. Во время матча твой Lua-код получает текущий снимок игровой ситуации и сам находит нужные цели и точки.
+
+Входные параметры
+ID команды = <например, atlas_tempo_v1>
+Название = <название в HUD>
+Замысел = <например, выиграть мид и взять две T1 к 15:00, пока позиция 1 добирает свой первый предмет>
+Предпочтительные герои = <герои и роли или «выбери сам»>
+Контрольный соперник = <gemini_neon, team_radiant, team_dire или ID другой команды>
+
+ID соперника нужен для выбора пары на проверке. Оценивай соперника по доступным пикам и наблюдениям во время матча. Если описание соперника не дано, строй план для разных драфтов.
+
+Задача
+
+Спроектируй одну команду для турнира ботов в аддоне ai. Выбери условие победы и реализуй его в драфте, закупе, распределении фарма, участии в драках и выборе объектов. Опиши в heroProfiles отдельных героев, важных для замысла. Например, дай инициатору свой порядок кнопок, а саппорту — позицию относительно кора и ответ на колл инициатора. Если параметры выше остались шаблонными, выбери уникальные ID, название и замысел самостоятельно. Оставь в начале Lua-файла короткий комментарий с замыслом, ключевым таймингом и условием, при котором команда меняет план.
+
+Верни только содержимое одного файла Lua. Его установят как scripts/vscripts/teams/<ID>/init.lua. ID должен состоять из латинских букв, цифр, дефисов или подчёркиваний. Если выбираешь ID сам, укажи его в первом комментарии. Используй Lua 5.1 и следующий каркас.
+
+    local BaseBot = require("sdk/dota_base/init")
+    return BaseBot.Create({
+        name = "Имя команды",
+        lanes = { "safe", "mid", "off", "off", "safe" },
+        draft = {
+            { "npc_dota_hero_sven", "npc_dota_hero_luna", "npc_dota_hero_juggernaut" },
+            { "npc_dota_hero_dragon_knight", "npc_dota_hero_lina", "npc_dota_hero_viper" },
+            { "npc_dota_hero_centaur", "npc_dota_hero_tidehunter", "npc_dota_hero_axe" },
+            { "npc_dota_hero_lion", "npc_dota_hero_shadow_shaman", "npc_dota_hero_vengefulspirit" },
+            { "npc_dota_hero_jakiro", "npc_dota_hero_lich", "npc_dota_hero_crystal_maiden" },
+        },
+        style = { commsFlame = 0 },
+    })
+
+Пулы в примере служат иллюстрацией формата. Подбери свои для выбранного плана. Используй несколько героев на каждую позицию, чтобы команда сохраняла замысел после банов и занятых пиков. Позициям 1–5 соответствуют POS_1_CARRY, POS_2_MID, POS_3_OFFLANE, POS_4_SOFT_SUPPORT и POS_5_HARD_SUPPORT. Движок проводит чередующийся драфт с общим списком занятых и забаненных героев. Если пул роли исчерпан, SDK подберёт другого доступного героя.
+
+SDK уже ведёт ластхит и денай, выбирает безопасные кемпы, добивает уязвимых врагов, качает способности, покупает и использует предметы, управляет курьером, нейтралками и объектами. Добавляй код, который выражает замысел команды. Возвращай nil из необязательных хуков, чтобы сохранить базовое решение, когда условия стратегии не выполнены.
+
+Как работает код команды
+
+Каркас уже подключён к турниру. При драфте он вызывает хуки выбора и банов, затем распределяет линии и в матче примерно каждые 0.15 секунды передаёт хукам свежий snapshot. Хуки получают обычные таблицы Lua и возвращают описания действий. Приказы адресуются пяти героям в snapshot.heroes. При выборе тактики учитывай, что управление призванными существами и иллюзиями по отдельности этот интерфейс не предоставляет. Поиск пути и исполнение приказов выполняет движок. Число в snapshot.time — игровые секунды относительно 0:00. До старта оно отрицательное.
+
+В изолированной среде доступны Lua 5.1, базовые функции вроде pairs, ipairs, type, tonumber, pcall и наборы math, string и table. Твоя единственная зависимость — require("sdk/dota_base/init"). Используй ctx.U для работы с данными. Именованные константы Dota, Vector, GameRules, GridNav, Entities, Bot API, файловый ввод-вывод и сеть из кода команды недоступны. Для состояния на несколько тиков используй ctx.mem и ctx.heroMem. Храни время, идентификаторы и короткие задачи, заново находи цели в текущем snapshot.
+
+Карта во время матча
+
+• Линии. top, mid и bot — физические линии. На Radiant safe = bot и off = top, на Dire safe = top и off = bot. В настройках драфта и раскладки можно задавать safe/off. В матче actor.lane уже содержит top, mid или bot. Определяй принадлежность точек сравнением с snapshot.team и snapshot.enemyTeam.
+• Координаты. pos — таблица {x=..., y=..., z=...}. Получай позиции из snapshot, env.macro, lane.defaultPos и союзников. Для небольшого смещения используй ctx.U.towards или ctx.U.away. ctx.U.dist возвращает расстояние по прямой в плоскости карты. По нему можно оценить близость, а проходимость и реальное время обхода рельефа определяет движок. Если герой застрял на своей задаче, сними её по таймеру и верни решение SDK.
+• Ориентиры. В snapshot.pins лежат записи с kind, pos и visible. В зависимости от точки могут присутствовать mapTeam, lane, tier, side, objective, targetId, active и charges. Набор ориентиров может быть неполным или пустым. U.findPin(snapshot, kind, pred) возвращает первый подходящий ориентир. Для ближайшего используй U.nearest(snapshot.pins, actor.pos, радиус, pred). visible показывает видимость координаты. Ищи фактические цели и доступные объекты в соответствующих списках.
+• База и башни. kind="fountain" — фонтан, "ancient" — трон, "lane" — опорная точка линии, "tower" — место башни. Для "lane" и "tower" фильтруй по lane и mapTeam, для башни можно уточнить tier. Безопасную точку TP ищи среди живых союзных башен в snapshot.allies. Вражескую башню можно атаковать по id из snapshot.enemies, если она жива и доступна для атак. В scoreboard.enemyAliveTowers ключи вида "mid1" показывают публично известные живые башни. Ориентиры башен остаются на карте после их падения.
+• Осада. У T4 в записи юнита tier=4, у бараков lane обозначает линию. Поля backdoorProtected и fortified показывают действующую защиту видимого здания. При четырёх и более погибших врагах macro.cleanPush ведёт команду по одной линии вслед за macro.pushWave. Если союзники возрождаются и численный перевес у соперника, macro.regroup означает выжидание и безопасный фарм.
+• Волны. В allies и enemies ищи движущихся крипов через U.isLaneCreep. У крипов lane обычно отсутствует. Определяй нужную волну по близости к живой башне, точке линии или союзному герою. Подводи героев к фактической волне. Если она пропала, проверь ориентир своей линии или верни nil и передай маршрут SDK.
+• Лес. kind="camp" в pins — место лагеря. Поле mapTeam служит подсказкой о территории, lane может отсутствовать. Видимых обычных нейтралов ищи в snapshot.neutrals по kind="neutral". Поле ancient отмечает древнего нейтрала. Для маршрута к лагерю можно пользоваться его pos. Для атаки бери id живого крипа из текущего списка. Для предпочтений по лесу используй ScoreFarmCamp, чтобы SDK мог распределять кемпы между союзниками.
+• Руны и объекты. В pins kind="power" или "bounty" означает место спавна, "lotus" — пруд, "wisdom" — точку опыта, "gate" — врата, "ward_spot" — точку для варда. У варда для объекта может быть objective="roshan" или "tormentor". Фактические руны лежат в runes с id, pos, необязательными spawnerKind и runeType. У видимых пруда и точки опыта могут быть active и charges. Проверяй доступность на текущем тике.
+• Рошан и Терзатель. kind="roshan" и "tormentor" в pins дают места проверки. Видимого босса того же kind ищи в neutrals. schedule помогает выбрать момент разведки, а решение о начале атаки принимай по видимому боссу и союзникам рядом. Дропы с доступным id и name находятся в snapshot.drops.
+• Туман войны. enemies, neutrals, runes и drops отражают текущую видимость. Отсутствие врага даёт неизвестность о том, где он находится. enemyLastSeen[id] хранит его прошлую запись с pos и at. Учитывай snapshot.time - at при оценке риска. Для attack, deny или каста по юниту находи цель в текущем снимке. Если она ушла из вижена или объект исчез, останови собственную серию приказов и верни nil.
+• Иллюзии и телепорты. Вражеские иллюзии приходят как kind="hero". SDK не сообщает, какая копия настоящая. Среди своих юнитов kind="illusion" и isIllusion помогают отличать копии. snapshot.teleports содержит активные прибытия с полями team и pos, иногда с heroId. Вражескую точку команда получает только в видимой области. В записи видимого героя teleporting показывает сам канал, который можно прервать.
+
+Пример профильного LanePosition, который держит саппорта позади союзного кора на обеих сторонах и работает при отсутствии части ориентиров.
+
+    LanePosition = function(ctx, snapshot, actor, lane)
+        if lane.urgency >= 0.8 then return nil end
+        local core = ctx.U.nearest(snapshot.heroes, actor.pos, 800, function(h)
+            return h.position <= 3 and h.lane == actor.lane
+        end)
+        if not core then return nil end
+        local tower = ctx.U.nearest(snapshot.allies, core.pos, 2500, function(u)
+            return u.kind == "tower" and u.lane == actor.lane
+                and u.team == snapshot.team and u.alive
+        end)
+        local fountain = ctx.U.findPin(snapshot, "fountain", function(p)
+            return p.mapTeam == snapshot.team
+        end)
+        local anchor = fountain or tower
+        if anchor then return ctx.U.towards(core.pos, anchor.pos, 280) end
+    end,
+
+Настройки
+
+Все перечисленные параметры передавай в style. Время считается в секундах от 0:00, дальности в единицах карты, пороги здоровья в долях от 0 до 1.
+
+• Экономика. jungleMinTime (270), jungleMinLevel (4), jungleMinHp (0.55), jungleSearchRange (3000), jungleDangerRadius (1100), farmWaveRange (1050), farmWhileStaging (true). Эти параметры меняют выбор волны и леса для позиций 1–3. При farmWhileStaging = false коры собираются на осаду даже без своей волны у цели.
+• Драка. finishMaxHits (3, значение 0 выключает раннее добивание обычными атаками), finishChaseRange (240 сверх радиуса атаки), fightMinHp (0.38), retreatHp (0.26), reengageHp (0.78), respectCooldowns (true). SDK оценивает броню, дистанцию и длительность серии атак. Управляй приоритетом целей через PickFocus и OverrideHero.
+• Восстановление кора. recoveryFarmSlots задаёт цель по крупным предметам для позиции 1 в проигрываемой игре. По умолчанию 3, можно поставить 4 или отключить режим значением 0. SDK пропускает обычные командные выходы, ищет безопасные волны и лес и продолжает участвовать в срочной защите базы. farmAbilities = false отключает автоматическую зачистку крипов способностями у выбранного героя.
+• Темп. laningEndTime (480), pushLaneOrder ({mid=1, bot=2, top=3}, меньшее число значит более высокий приоритет), pushMinAlive (3), hgMinAlive (4), hgAegisMinAlive (3), endgamePushTime (2700).
+• Объекты. roshanMinTime (1020), roshanMinAlive (4), tormentorMinTime (900), tormentorMinAlive (3), smokeMinTime (420), smokeCooldown (120).
+• Старт. preGameMode ("auto", "safe_bounty" или "smoke_invade"), preGameSmokeChance (0.45), bountyFight (true), randomDraft (по умолчанию выключен).
+• Чат. commsEnabled (true) включает автоматические события SDK. Значение false оставляет сценарии твоих хуков. commsFlame (0.7) меняет частоту конфликтных реплик. Для спокойной команды установи commsFlame = 0.
+
+В корне конфигурации доступны startItems[позиция], roleBuilds[позиция], heroBuilds[имя героя] и itemValues[имя предмета]. Закупы задавай списками внутренних имён в порядке покупки. heroBuilds имеет приоритет над roleBuilds. GetItemBuild удобен, когда сборка зависит от драфта или стадии матча. Для героя используй ID npc_dota_hero_*, для предмета item_*, для способности имя из actor.abilities. Если сомневаешься в ID способности или предмета, сохрани базовое решение SDK для этой части.
+
+skills[имя героя] переопределяет целиком профиль героя. Формат профиля { order = {1, 2, 3, ...}, list = {{имя, режим, дальность, тег}, ...} }. order ссылается на индексы list, четвёртая запись list отведена под ультимейт. Для точечной прокачки проще использовать PickSkill, сохраняя стандартные правила каста. Сверяй имена и доступность навыков со snapshot. У Dragon Knight Wyrm’s Wrath имеет имя dragon_knight_wyrms_wrath, а Dragon Blood является врождённой пассивкой.
+
+Индивидуальные профили
+
+Передай heroProfiles в BaseBot.Create. Ключ — внутреннее имя героя, значение — таблица настроек и функций именно этого героя. В draft по-прежнему укажи его доступные позиции и кандидатов на замену. Одно и то же имя героя может встречаться в разных пулах. Профиль применяется к выбранному герою на любой позиции, а actor.position позволяет уточнить его поведение для конкретной роли.
+
+    heroProfiles = {
+        npc_dota_hero_dragon_knight = {
+            lane = "mid",
+            draftWeight = 10,
+            startItems = {"item_tango", "item_quelling_blade", "item_branches"},
+            itemBuild = {"item_bottle", "item_power_treads", "item_blink", "item_black_king_bar"},
+            skillBuild = {[2] = "dragon_knight_wyrms_wrath"},
+            style = {laneDistanceOffset = 100, laneStrafeScale = 0.5, laneHarass = false},
+            manualAbilities = {dragon_knight_elder_dragon_form = true},
+            UseAbilities = function(ctx, snapshot, actor, env)
+                local name = "dragon_knight_elder_dragon_form"
+                if env.enemyCount >= 2 and ctx.U.canCast(actor, env.skills[name]) then
+                    return {kind = "cast", ability = name, status = "Форма на драку"}
+                end
+            end,
+        },
+    }
+
+• Драфт и линия. draftWeight прибавляется к оценке доступного героя из пула. lane задаёт одну из "safe", "off", "top", "mid", "bot". Если GetLanes вернул линию для этой позиции, выбирается линия из хука. В остальных случаях работают профиль героя и общая раскладка lanes.
+• Лайнинг. style.laneDistanceOffset (0) смещает точку относительно крипа, положительное значение отводит героя назад. Перед ластхитом смещение ослабевает. laneStrafeScale (1) меняет размах мансов, 0 убирает автоматические качания. laneHarass (true) включает обычный размен с руки. wavePushTime (420) и pushUnopposedWave (true) управляют ранним проталкиванием волны. Здесь же можно переопределить параметры экономики и драки из раздела «Настройки». Решения по общему темпу, боссам и прегейму задавай в корне.
+• Прокачка и закуп. skillBuild[уровень героя] задаёт имя способности или таланта. Для особых условий добавь PickSkill. Если выбранный навык недоступен, SDK проверит следующие правила. skills меняет полный профиль способностей только для этого героя. startItems и itemBuild задают начальную закупку и дальнейший билд. Ключи manualAbilities и manualItems имеют вид {[имя] = true} и резервируют конкретные кнопки для твоей логики. manualItems отключает автоматическое применение в обычном боевом выборе SDK, а отдельные приказы вроде TP остаются частью общего плана.
+• Функции PickSkill, GetItemBuild, ChooseNeutral, ScoreFarmCamp и OverrideHero из раздела ниже можно задать внутри профиля. Профильный выбор действует для этого героя. Командные хуки и SDK служат дальнейшими правилами. ChooseNeutral может заменить одно поле уже выбранной пары. В профильных хуках ctx.style содержит эффективные настройки героя, ctx.heroMem хранит личное состояние, а ctx.mem доступен всем профилям этой команды.
+• UseItems(ctx, snapshot, actor, env) и UseAbilities(ctx, snapshot, actor, env) → одно действие cast или toggle с полем item или ability соответственно. nil передаёт этап SDK, false пропускает его в текущем тике. Эти хуки выполняются после безопасного добивания. Выбор активного предмета идёт перед способностью. Для очередности вроде «стан → Blink союзника → атака» используй OverrideHero и состояние ctx.heroMem, сверяя следующие шаги со свежим snapshot. ctx.U.canCast(actor, env.skills[name]) проверяет доступность способности. Дальность и цель проверяй отдельно.
+• Готовые комбинации. SDK ведёт Blade Mail → Blink → Duel у Legion Commander и оба каста Ice Blast у Ancient Apparition. Чтобы целиком заменить комбинацию, зарезервируй Duel или обе кнопки Ice Blast через manualAbilities. Вторая кнопка ancient_apparition_ice_blast_release становится видна после пуска метки и вызывается без цели. При низком HP SDK может применить готовые BKB и Satanic и продолжить начатый бой. Для самостоятельного управления зарезервируй эти предметы через manualItems.
+• PickTarget(ctx, snapshot, actor, defaultEnemy) → видимый вражеский герой из snapshot.enemies в пределах 1350. Это цель для данного героя. PickFocus в корне меняет общий фокус всей команды.
+• LaneAction(ctx, snapshot, actor, lane) → один приказ после проверки доступных ластхитов и денаев. Используй для своего размена, пула или перемещения к напарнику. lane содержит creep, isEnemyCreep, creepAboutToDie, enemy, enemyCount, allyCount, coreNearby, prioritizeFarm и basePos. creep может отсутствовать, в том числе у саппорта рядом с фармящим кором.
+• LanePosition(ctx, snapshot, actor, lane) → {x=..., y=..., z=...} при обычном позиционировании. В lane доступны defaultPos, creep, isEnemyCreep, urgency (0–1), enemy, enemyCount, allyCount, coreNearby, prioritizeFarm и basePos. При свободной линии creep может отсутствовать. SDK проверяет позицию под вражеской вышкой.
+• PlanHero(ctx, snapshot, actor, macro, defaultGoal) → цель в формате heroGoals, nil для текущей цели или false для снятия личной задачи. Например, {mode="split_push", pos=wave.pos} отправляет героя на боковую линию. Проверки непосредственной угрозы и защита базы сохраняют приоритет при стандартном поведении.
+
+Командная связь и реакции
+
+• OnComms(ctx, snapshot, actor, macro, directive) внутри профиля добавляет колл или ответ. В корне команды сигнатура OnComms(ctx, snapshot, macro, directive) работает без аргумента героя. Сначала выполняется командный хук, затем профили в порядке героев. Следующий герой в том же тике видит новую директиву.
+• ctx.say(actor, text, tone, delay) выводит реплику героя в турнирный чат. tone можно задать как "call", "reply" или "praise", delay задаётся в секундах. Пользовательская реплика одного героя проходит не чаще одного раза в три секунды. Для редких коллов и ответов веди собственный таймер или ключ последнего события в ctx.heroMem.
+• ctx.setDirective({kind="HELP_GANK", callerId=actor.id, pos=actor.pos, assignedIds={[ally.id]=true}, expiresAt=snapshot.time+10}) зовёт конкретного союзника к точке. Профиль союзника может увидеть свой id в directive.assignedIds и подтвердить через ctx.say. WAIT_ITEM принимает callerId, item и необязательный itemLabel. WAIT_ULT откладывает обычный пуш, пока SDK ждёт ульты. NEED_WARDS повышает приоритет вижена, GO_FIGHT передаёт метку готовности. expiresAt — игровое время окончания колла, без него директива живёт 10 секунд.
+• FormatChat(ctx, snapshot, actor, message) можно задать как в профиле, так и в корне. message содержит text, tone, heroId и sender. Возвращай новую строку, false для скрытия или nil для стандартной реплики. chat = false в профиле убирает реплики этого героя из HUD. Привязывай текст к событиям, которые герой наблюдает, и используй директиву, если колл должен менять приказы.
+
+Функции стратегии
+
+Первый аргумент каждого хука — ctx. В ctx.U доступны dist(a,b), towards(a,b,len), away(a,threat,len), ratio(a,b), armorMult(armor), nearest(list, origin, maxDist, pred), countNear(list, origin, radius, pred), findPin(snapshot, kind, pred), isRealHero(u), isLaneCreep(u), isBuilding(u), hasItem(actor,name,onlyMain), itemCd(actor,slot), itemCharges(actor,slot), itemSecCharges(actor,slot), skillMap(actor) и canCast(actor,ability). nearest возвращает запись и расстояние, hasItem возвращает номер слота или nil, skillMap даёт таблицу способностей по имени. В Lua слот 0 считается истинным. Переданные snapshot, macro и записи целей используй как данные для чтения.
+
+• BanHero(ctx, available, allyPicks, enemyPicks, bans) → ключ героя из available. PickHero(ctx, pos, role, available, allyPicks, enemyPicks, bans) → доступный герой или nil для выбора из draft. available — таблица { [имя героя] = true }. allyPicks и enemyPicks индексируются по позициям 1–5 и во время драфта могут иметь пропуски. bans — список уже забаненных имён.
+• GetLanes(ctx, side, allyPicks, enemyPicks) → линии по позициям. Можно вернуть только позиции, которые должны поменяться из-за драфта. side имеет значение "radiant" или "dire".
+• PickSkill(ctx, snapshot, actor, skills) → строка с именем из skills, если у способности canUpgrade и она видима в панели, то есть hidden ~= true. Для обычного навыка проверь actor.abilityPoints. Для талантов действуют отдельные очки. canUpgrade уже учитывает выбор одной стороны на 10/15/20/25 и открытие оставшихся сторон на 27/28/29/30. У таланта поле talentRequiredLevel показывает его текущий порог открытия.
+• GetItemBuild(ctx, actor, threats, defaultBuild, snapshot) → непустой список предметов. SDK передаёт уже адаптированный defaultBuild. При необходимости сделай его копию и добавь в неё свой тайминг. Среди полей threats используются invis, evasion и heal.
+• В поздней игре стандартный билд может достроить Echo Sabre в Harpoon и заменить стартовый слот. Для своего порядка добавь Harpoon или альтернативный предмет в itemBuild. actor.courier.carrying перечисляет груз даже во время смерти курьера. Boots of Travel улучшают свиток TP. Готовность проверяй по actor.tpCastable, а для обычной защиты выбирай точку рядом с живой союзной башней.
+• ChooseNeutral(ctx, actor, options, defaultChoice, snapshot) → {artifact = "...", enchantment = "..."}. Выбирай из options.artifacts и options.enchantments. У записи есть name, stats, у артефакта могут быть active и keepCurrent, у зачарования есть level. Можно вернуть только одно поле, SDK подберёт второе. Варианты выдаёт текущий матч, поэтому используй их свойства, а не фиксированный тир-лист.
+• ScoreFarmCamp(ctx, snapshot, actor, camp, defaultScore) → новое число, false для пропуска или nil. camp содержит pos, distance, count, один из видимых neutral в target при наличии и pin при привязке к лагерю. У пустого разведочного кемпа target отсутствует. Опасные и уже выбранные союзником лагеря отсекаются до хука. Больший score даёт более высокий приоритет. Например, дай позиции 1 бонус за крупную группу видимых крипов, а позиции 3 за небольшое отклонение от маршрута команды.
+• PickFocus(ctx, snapshot, defaultEnemy) → запись видимого героя из snapshot.enemies, то есть таблица с id, hp и pos. Учитывай доступность цели для союзников, защиту и прерываемые каналы.
+• PlanMacro(ctx, snapshot, defaultMacro) → таблица с phase и нужными полями. Допустимые фазы SDK — BOUNTY_START, LANING, DEFEND, PUSH, ROSHAN, TORMENTOR и SMOKE_GANK. LANING также означает свободный фарм после линий. Специальную задачу одного героя проще задать в PlanHero. Для нескольких можно вернуть копию defaultMacro с собственной таблицей heroGoals, сохранив поля команды и срочный DEFEND. Ключ heroGoals[actor.id] может содержать {mode="laning"}, {mode="split_push", pos=...}, {mode="gank", pos=...}, {mode="attack", targetId=...} или {intent=<одно действие>}. mode="laning" оставляет героя на стандартном маршруте фарма. Отключай специальную задачу после достижения тайминга, потери цели или изменения ситуации.
+• OverrideHero(ctx, snapshot, actor, env) → одна таблица действия либо nil. Хук исполняется после проверки башни, агро крипов и вражеских телепортов, перед стандартным выбором атаки, предмета или способности. В env доступны macro, goal, enemy, enemyCount, allyCount, threats, basePos, skills, situation, readiness, myReadiness, directive, finishTarget, prioritizeFarm, isLaning, defending, waitingForWave, immediateLastHit, underPressure, recoveryFarm, incomingAllies и incomingEnemies. Если finishTarget есть, сохрани базовое добивание, если у твоего героя нет более важного сейва или прерывания.
+
+Данные и действия
+
+• snapshot.heroes — свои управляемые герои по ролям. snapshot.allies — видимые движку союзные объекты, в том числе волны, здания и варды. snapshot.enemies — видимые враги. Общие поля записи юнита — id, name, kind, team, pos, hp, maxHp, alive, invulnerable, attackImmune. Среди kind есть hero, illusion, lane_creep, siege_creep, tower, barracks, ancient, neutral, roshan, tormentor, observer_ward и sentry_ward. Башня может иметь lane и tier, союзная постройка — underAttack, союзный крип — deniable.
+• У своего героя есть position, role, lane, level, gold, mana, maxMana, attackRange, attackDamage, attackPoint, secondsPerAttack, moveSpeed, ranged, armor, stunned, silenced, hexed, disarmed, rooted, channeling, casting, items, abilities, abilityPoints, courier и neutral. items[slot] — имя предмета. itemCooldown, itemCharges, itemSecondaryCharges и itemToggle используют те же индексы. У вражеских героев в обзоре доступна часть игровых характеристик и видимый инвентарь. Способности с точным состоянием предоставляются своим героям.
+• abilities[slot] содержит name, level, maxLevel, cooldown, manaCost, castRange, passive, hidden, behavior, targetTeam, isUltimate, toggle, autoCast, fullyCastable, canUpgrade. abilities и items индексируются с нуля и могут содержать пропуски. Перебирай их через pairs. Для каста используй нужный навык из ctx.U.skillMap(actor) или env.skills. Если определяешь тип каста по behavior, это битовая маска. Бит 4 соответствует no-target, 8 — unit-target, 16 — point-target. В Lua 5.1 бит проверяется через math.floor((ability.behavior or 0) / flag) % 2 == 1. targetTeam со значением 1 означает союзников, 3 — обе стороны. Используй фактические castRange и fullyCastable, затем проверь цель и позицию.
+• snapshot.scoreboard содержит allyKills, enemyKills, allyDeadCount, enemyDeadCount, enemyMinRespawn, allyAvgLevel, enemyAvgLevel, allyTowersLeft, enemyTowersLeft и enemyAliveTowers. snapshot.enemyCooldowns — список отслеживаемых действий врага с heroId, ability, isUlt, isItem, castAt, readyAt и remaining. Он отражает наблюдавшиеся события, поэтому отсутствие записи оставляет готовность кнопки неизвестной.
+• В snapshot.schedule есть power, water, bounty, lotus, wisdom, roshan и tormentor. Периодические события дают nextAt и могут давать lastAt. У water после второй руны nextAt отсутствует. У roshan используй окно minRespawnAt–maxRespawnAt, у tormentor — nextAt. Для атаки босса и подбора дропа требуется текущая видимая запись.
+• У defaultMacro всегда есть phase. pos доступна у активных целей, а label, situation, heroGoals и bossPlan могут отсутствовать. В PUSH есть lane и tier, когда SDK ведёт команду к линии и башне. targetBuilding и targetId зависят от видимости и доступности здания. DEFEND использует building, urgent и localOnly. У ROSHAN и TORMENTOR цель атаки берётся из видимого neutrals. Если объявляешь собственный PUSH, DEFEND, ROSHAN, TORMENTOR или SMOKE_GANK, бери pos из текущего снимка либо возвращай nil. Для смены темпа и приоритетов обычно достаточно style, а SDK сам выбирает цели и маршруты.
+
+Примеры главных действий для OverrideHero, LaneAction и heroGoals.intent.
+
+    { kind = "attack", target_id = enemy.id, status = "Добиваю цель" }
+    { kind = "move", position = marker.pos, status = "Выхожу к союзникам" }
+    { kind = "attack_move", position = marker.pos }
+    { kind = "cast", ability = "<имя способности>", target_id = enemy.id }
+    { kind = "cast", ability = "<имя способности>", position = enemy.pos }
+    { kind = "cast", item = "<имя предмета>" }
+    { kind = "tp", position = alliedTower.pos }
+    { kind = "deny", target_id = alliedCreep.id }
+    { kind = "hold" }
+    { kind = "rune", target_id = rune.id }
+    { kind = "pickup", target_id = drop.id }
+    { kind = "lotus", position = lotusPin.pos }
+    { kind = "shrine", position = wisdomPin.pos }
+    { kind = "gate", position = gatePin.pos }
+
+Указывай либо target_id, либо position в зависимости от поведения каста. Для no-target пропусти оба. Для атак и кастов по юниту target_id берётся из записи юнита. Для рун и дропов используй id из runes и drops. Для пруда, точки опыта и врат можно передать pos соответствующего ориентира, а для взаимодействия движок сам проверит видимость и дистанцию. Названия точек и действий могут отличаться, например wisdom → shrine. Для нестандартного пула или стака используй обычное движение и атаку по видимому крипу.
+
+Исполнитель принимает только один главный приказ на героя за тик. Покупки, прокачка и другие фоновые стадии уже запускаются SDK. Для комбо делай один шаг за раз и сверяй результат в следующем снимке по касту, контролю, КД или доступности цели для атаки. При исчезновении цели, окончании таймера или изменении фазы передавай решение SDK.
+
+Как сделать команды разными
+
+• Экономика через керри. Выбери безопасный драфт и ясный предметный тайминг. Позиции 2–4 удерживают пространство и реагируют на защиту. Позиция 1 чередует ближние волны с лагерями и подключается при готовности предмета, возможности добить героя или срочной защите.
+• Темпо и осада. Сделай ставку на сильные уровни 6–10, контроль цели и ранние T1. Назначай пуш только с подходящей волной и достаточным числом героев. После успешной драки выбирай достижимую башню или Рошана.
+• Пик-офф. Подбери пару мобильного инициатора и короткого контроля. Заходи на изолированную видимую цель, проверяй готовность союзников, сохраняй ресурсный выход для керри и прекращай погоню при потере обзора или угрозе башни.
+• Сплит-пуш. Назначай отдельному герою доступную боковую волну, пока остальные давят другую линию. Снимай задачу при угрозе базе или когда цель сплит-пуша перестала быть безопасной. Измени драфт, экономику и момент присоединения команды под этот план.
+
+Выбери один замысел и вырази его минимум тремя согласованными решениями. Например, драфт (кто инициирует и кто ломает вышки), экономика (кому лес и где) и макро (когда собираться). Продумай ход при проигранной линии и после первого удачного боя. Проверь, что касты переходят в серии обычных атак, а саппорты не забирают доступный фарм ближайшего кора.
+
+Проверка в аддоне
+
+Перед выдачей кода мысленно проверь обе стороны, пустые pins, потерю цели из обзора и отсутствие выбранного героя в драфте. Это статическая проверка логики. Для запуска и сравнения после установки файла оператор турнира может выполнить следующие команды до выбора матча.
+
+    tournament_matchup <ID> gemini_neon
+    tournament_matchup gemini_neon <ID>
+
+Команды рассчитаны на два отдельных матча со сменой сторон. Чтобы добавить команду в меню выбора, внеси её ID и label в AVAILABLE_TEAMS в scripts/vscripts/addon_game_mode.lua. Для консольного запуска регистрация в меню не требуется.
+
+Сравни результаты с тем же соперником с обеих сторон. В реплее проверь первые три уровня ДК, фарм линий и леса у позиций 1–3, ластхиты и net worth на 10:00 и 20:00, атаку после кнопок, отход из-под башни и срочный возврат на защиту базы. Команда tournament_check_neutrals покажет прогресс безумрудов, варианты, экипировку и ошибки крафта. Смотри Errors и NW в итоговом логе турнира. Зафиксируй расхождения между замыслом и реальными приказами и внеси точечное изменение в свой Lua-файл.
